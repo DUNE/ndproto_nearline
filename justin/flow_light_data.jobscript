@@ -17,7 +17,6 @@ source "$ND_NEARLINE_SCRIPTS_DIR/ndproto_nearline/justin/setup.inc.sh"
 output_fname=$(basename "$input_fname" .data).${ND_NEARLINE_TAG}.FLOW.hdf5
 
 python "$(which metacat)" file show -mj "$did" > "${input_fname}.json"
-ls -l
 
 # Run3 is using _Run2.yaml
 workflow='yamls/proto_nd_flow/workflows/light/light_event_building_mpd_Run2.yaml'

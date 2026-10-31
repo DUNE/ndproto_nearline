@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+## Example command to submit this job:
+# justin simple-workflow \
+#     --wall-seconds 1200 \
+#     --output-pattern '*.FLOW.hdf5' \
+#     --scope usertests \
+#     --lifetime-days 30 \
+#     --image fnal-wn-el9:9.7 \
+#     --mql "files where core.run_type=vd-coldbox-pixels and core.date_tier=packet-raw and core.application.version=test" \
+#     --env ND_NEARLINE_TAG=v1 \
+#     --env ND_NEARLINE_SCRIPTS_DIR=/cvmfs/fifeuser1.opensciencegrid.org/sw/dune/363f882722ab8dc8e82cc9ec75d521b43251ceb8 \
+#     --jobscript flow_charge_data.jobscript
+
+## Example command to test this job:
+# ./justin-test-jobscript.al9 \
+#     --mql "files where core.run_type=vd-coldbox-pixels and core.date_tier=packet-raw and core.application.version=test limit 1" \
+#     --env ND_NEARLINE_TAG=test \
+#     --env ND_NEARLINE_SCRIPTS_DIR=/cvmfs/fifeuser1.opensciencegrid.org/sw/dune/363f882722ab8dc8e82cc9ec75d521b43251ceb8 \
+#     --jobscript flow_charge_data.jobscript
+
+source "$ND_NEARLINE_SCRIPTS_DIR/ndproto_nearline/justin/setup.inc.sh"
+
+yamldir=${ND_NEARLINE_YAML_DIR:-pCRP_flow}
+
+output_fname=$(basename "$input_fname" .PACKET.hdf5)
+output_fname=${output_fname%.*} # strip previos tag
+output_fname=${output_fname}.${ND_NEARLINE_TAG}.FLOW.hdf5
+
+python "$(which metacat)" file show -mj "$did" > "${input_fname}.json"
+
+workflow1="yamls/$yamldir/workflows/charge/charge_event_building_data.yaml"
+workflow2="yamls/$yamldir/workflows/charge/charge_event_reconstruction_data.yaml"
+workflow3="yamls/$yamldir/workflows/combined/combined_reconstruction_data.yaml"
+workflow4="yamls/$yamldir/workflows/charge/prompt_calibration_data.yaml"
+
+xrdcp "$pfn" .
+input_file=$PWD/$input_fname
+output_file=$PWD/$output_fname
+
+# FIXME: Update path; must include pCRP_flow
+pushd /cvmfs/fifeuser4.opensciencegrid.org/sw/dune/10bba04d514dee870f62ce342ca5dddeace41a9a/ndlar_flow
+python -m h5flow -i "$input_file" -o "$output_file" -c "$workflow1" "$workflow2" "$workflow3" "$workflow4"
+popd
+
+python $scripts_dir/ndproto_nearline/justin/dump_metadata.light_flow.py \
+    "${input_fname}.json" "${output_fname}"
+
+echo "$did" > /home/workspace/justin-processed-dids.txt

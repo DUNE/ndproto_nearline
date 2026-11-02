@@ -36,7 +36,7 @@ def dump(json_infile: Path, data_outfile: Path):
         'core.application.family': 'larpix-control',
         'core.application.name': 'bin2packet',
         'core.application.version': os.getenv('ND_NEARLINE_TAG', 'develop'),
-        'core.data_tier': 'packet-raw',
+        'core.data_tier': 'decoded-raw',
         'core.data_stream': md_in['core.data_stream'],
         'core.start_time': md_in['core.start_time'],
         'core.end_time': md_in['core.end_time'],

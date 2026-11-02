@@ -1222,8 +1222,8 @@ def main():
         # filename = f'{args.input_path}{all_files[i_file]}'
         # HACK: Use start_run literally, instead of as an index into a (wrongly-)sorted list
         # (this is OK for the nearline, which just runs on one file at a time)
-        filename = f'{args.input_path}{args.file_syntax}{i_file}{EXT}'
-        #filename = f'{args.input_path}{args.file_syntax}{i_file:05d}{EXT}'
+        #filename = f'{args.input_path}{args.file_syntax}{i_file}.FLOW.hdf5'
+        filename = f'{args.input_path}{args.file_syntax}{i_file:05d}{EXT}'
         # just the file name, no path and cutting off .FLOW.hdf5
         # short_filename = all_files[i_file][:-10]
         short_filename = os.path.basename(filename)[:-10]

@@ -12,7 +12,7 @@ copy_one() {
 
     if [[ ! -f "$f_meta" ]]; then
         echo "Missing metadata for $f. Skipping."
-        exit 1
+        return
     fi
 
     out_name=$(basename "$f" .h5).hdf5
@@ -41,8 +41,10 @@ while true; do
         if [[ -e "$f_out" || -e "$f_out.copied" ]]; then
             continue
         fi
+        echo $file
         copy_one "$file"
     done
+    echo zzz
     sleep 60
 done
 

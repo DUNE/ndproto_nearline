@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Check input_folder of a workflow-runner config every --interval and run the
-# workflow on each new file once it has stopped growing.
+# specified workflow on each new file once it has stopped growing.
 # Files already there at startup are skipped (use `workflow-runner batch` for those),
 # unless they are still being written.
 import argparse

@@ -1,10 +1,10 @@
-name: plot_latestfile_workflow
+name: plot_latestfile_tiles_workflow
 description: Raw or packet LArPix file -> packet file -> pedestal mean/RMS maps of the CRP
 
 # EDIT: folder where the DAQ writes the raw binary (or packet) files
-input_folder: /Users/ceciliaferrari/home/cecilia/Documents/PostDoc/DUNE software/CERN_coldbox_nearline/data_2
+input_folder: /data3/pCRP/
 # EDIT: where outputs go (must NOT be inside input_folder)
-output_folder: /Users/ceciliaferrari/home/cecilia/Documents/PostDoc/DUNE software/CERN_coldbox_nearline/plots_ped
+output_folder: /data3/pCRP_nearline_generated_packet_files/
 
 # raw and packet files: step 1 checks which one each file is
 # (any other .hdf5/.h5 file in input_folder fails at step 1 with a message)
@@ -25,8 +25,8 @@ steps:
   # Step 1: raw -> <output_folder>/convert_to_packet/<name>.hdf5
   #         (packet input -> symlink to it there, no conversion)
   - name: "convert_to_packet"
-    command: "\"$COLDBOX_NEARLINE_DIR/packetize.sh\" '{input}' '{packet_file:.hdf5}'"
+    command: "\"$COLDBOX_NEARLINE_DIR/actions/packetize.sh\" '{input}' '{packet_file:.hdf5}'"
 
   # Step 2: pedestal map -> <output_folder>/panel_ped/<name>.png (+ .json)
   - name: "panel_ped"
-    command: "\"$COLDBOX_NEARLINE_DIR/plot_panel_ped.sh\" '{packet_file}' '{panel_ped:.png}'"
+    command: "\"$COLDBOX_NEARLINE_DIR/actions/plot_panel_ped.sh\" '{packet_file}' '{panel_ped:.png}'"

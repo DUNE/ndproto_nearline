@@ -93,12 +93,12 @@ def main(input_file, output_file, geometry, mean_max, rms_max):
     # default color scale: 99th percentile of the data
     values = np.array([v for channels in d.values() for v in channels if v[0] != -1])
     if mean_max is None: mean_max = np.percentile(values[:, 0], 99)
-    if rms_max is None: rms_max = np.percentile(values[:, 1], 99)
+    if rms_max is None: rms_max = np.percentile(values[:, 2], 99)
 
     fig, axes = plt.subplots(1, 2, figsize=(24, 12), constrained_layout=True)
     fig.suptitle(Path(input_file).stem, fontsize=18)
     anode_plot(axes[0], geo, d, 0, mean_max, 'Mean')
-    anode_plot(axes[1], geo, d, 1, rms_max, 'RMS')
+    anode_plot(axes[1], geo, d, 2, rms_max, 'RMS')
 
     print('Saving to: ', output_file)
     fig.savefig(output_file)

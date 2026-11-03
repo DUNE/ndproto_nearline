@@ -1,0 +1,32 @@
+name: plot_fast_thresholds_workflow
+description: Raw or packet LArPix file -> packet file -> pedestal mean/RMS maps of the CRP in ke-
+
+# EDIT: folder where the DAQ writes the raw binary (or packet) files
+input_folder: /nfs/rscratch/pCRP/commissioning
+# EDIT: where outputs go (must NOT be inside input_folder)
+output_folder: /nfs/rscratch/pCRP/plots_thresholding/
+
+# raw and packet files: step 1 checks which one each file is
+# (any other .hdf5/.h5 file in input_folder fails at step 1 with a message)
+file_patterns:
+  - "*.hdf5"
+  - "*.h5"
+
+recursive: true
+
+# a file is processed once it has not been modified for this many seconds
+stability_check_time: 20
+stability_check_interval: 3
+
+# $COLDBOX_NEARLINE_DIR = this folder (set automatically by watch_latestfile.py;
+# export it yourself for `workflow-runner process/batch`).
+# Paths are quoted because workflow-runner does not quote them.
+steps:
+  # Step 1: raw -> <output_folder>/convert_to_packet/<name>.hdf5
+  #         (packet input -> symlink to it there, no conversion)
+  - name: "convert_to_packet"
+    command: "\"$COLDBOX_NEARLINE_DIR/actions/packetize.sh\" '{input}' '{packet_file:.hdf5}'"
+
+  # Step 2: pedestal map -> <output_folder>/panel_ped/<name>.png (+ .json)
+  - name: "panel_ped"
+    command: "\"$COLDBOX_NEARLINE_DIR/actions/plot_panel_ped.sh\" '{packet_file}' '{panel_ped:.png}'"

@@ -49,6 +49,93 @@ def load_geometry(geometry_path):
     geo['tile_labels'] = labels
     return geo
 
+def convert_to_mv(d, asic_version, VDDA, vref_dac, vcm_dac):
+    adc_lsb_mv = None #(mV/ADC bin)
+    if asic_version == '2d': adc_lsb_mv = VDDA * (vref_dac - vcm_dac)/256 /256
+    elif asic_version == '3': adc_lsb_mv = VDDA * (vref_dac / 256) * (2 / 1023)
+    if not adc_lsb_mv: raise RuntimeError('Unrecognized ASIC version, examples "2d" or "3"')
+    return d*adc_lsb_mv
+
+def convert_to_ke(d, asic_version, VDDA, vref_dac, vcm_dac):
+    if asic_version == '2d': gain = 2.46 #(mV/ke-)
+    elif asic_version == '3': gain = 3.4
+    return convert_to_mv(d, asic_version, VDDA, vref_dac, vcm_dac)/gain #(ke-/ADC bin)
+
+
+V3_IO_GROUPS = (3, 4)  # LArPix-v3, the others are v2d
+VCM_DAC_V2D = 68       # v3 does not use vcm: 0 is a placeholder
+
+
+def convert_json_to_ke(d, geo, vdda_spec):
+    # Same structure as the make_mean_std_json.py JSON, with mean and std (columns 0, 1)
+    # in ke- instead of ADC. vdda_spec: {'iog-n': [vref, vdda]} (both mV, n = tile number as
+    # in the tile labels); vref = VDDA * vref_dac / 256, so vref_dac = 256 * vref / VDDA.
+    # Chips whose tile is not in the geometry or not in vdda_spec are dropped (listed).
+    with open(vdda_spec) as f:
+        spec = json.load(f)
+    out, missing = {}, set()
+    for chip_key, channels in d.items():
+        iog, ioc, _ = map(int, chip_key.split('-'))
+        tile = geo['ioc_to_tile'].get((iog, ioc))
+        label = geo['tile_labels'].get(tile)
+        if label not in spec:
+            missing.add(label if tile is not None else 'io_group {} io_channel {}'.format(iog, ioc))
+            continue
+        vref, vdda = spec[label]
+        vref_dac = 256 * vref / vdda
+        if iog in V3_IO_GROUPS:
+            asic, vcm_dac = '3', 0
+        else:
+            asic, vcm_dac = '2d', VCM_DAC_V2D
+        out[chip_key] = [
+            [convert_to_ke(v[0], asic, vdda, vref_dac, vcm_dac),
+             convert_to_ke(v[1], asic, vdda, vref_dac, vcm_dac)] + list(v[2:])
+            if v[0] >= 0 else list(v)  # -1 = no data, kept as is
+            for v in channels]
+    if missing:
+        print('No vref/VDDA (not converted to ke-): {}'.format(sorted(missing)))
+    return out
+
+
+def percentile_range(values, lo=1, hi=99):
+    # colour range from the 1st-99th percentile of the valid (>= 0) values
+    values = np.asarray(values, dtype=float)
+    values = values[values >= 0]
+    if len(values) == 0:
+        return 0., 1.
+    vmin, vmax = np.percentile(values, [lo, hi])
+    if vmax <= vmin:
+        vmax = vmin + max(abs(vmin) * 0.1, 1e-3)
+    return vmin, vmax
+
+
+def hist_per_iog(d, column, xlabel, title, output_file, nbins):
+    # 1D histogram of one JSON column, all channels + one line per io_group
+    values = {}  # io_group -> values
+    for chip_key, channels in d.items():
+        iog = int(chip_key.split('-')[0])
+        values.setdefault(iog, []).extend(v[column] for v in channels if len(v) > column and v[column] >= 0)
+    all_values = np.concatenate([np.array(r) for r in values.values()]) if values else np.array([])
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    if len(all_values):
+        bins = np.linspace(0, max(all_values.max(), 1e-3) * 1.01, nbins + 1)
+        ax.hist(all_values, bins=bins, color='lightgrey', label='all ({} channels)'.format(len(all_values)))
+        for iog in sorted(values):
+            ax.hist(values[iog], bins=bins, histtype='step', label='io_group {}'.format(iog))
+        ax.set_yscale('log')
+        ax.legend()
+    else:
+        ax.text(0.5, 0.5, 'No data available\n(no data or no valid packets)',
+                ha='center', va='center', transform=ax.transAxes)
+    ax.grid(True)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel('Counts')
+    ax.set_title(title)
+    print('Saving to: ', output_file)
+    fig.savefig(output_file)
+    plt.close(fig)
+
 
 def tile_images(geo, d, metric):
     # one (ny, nx) image per tile, pixel index = chip_channel_to_position
@@ -120,7 +207,7 @@ def anode_plot(ax, geo, d, metric, vmax, label, min_bar=0):
     plt.colorbar(im, ax=ax, label=label, shrink=0.6)
 
 
-def main(input_file, output_file, geometry, mean_max, rms_max, rate_max, occupancy_max, rate_min, occupancy_min, nbins=100):
+def main(input_file, output_file, geometry, vdda_spec, mean_max, rms_max, rate_max, occupancy_max, rate_min, occupancy_min, nbins=100):
     with open(input_file) as f:
         d = json.load(f)
     geo = load_geometry(geometry)
@@ -132,6 +219,28 @@ def main(input_file, output_file, geometry, mean_max, rms_max, rate_max, occupan
 
     print('Saving to: ', output_file)
     fig.savefig(output_file, dpi=100)
+
+    # same but in ke- instead of ADC (converting ADC in mV and then to ke-),
+    # ASIC version is v3 for iog3 and 4 and v2d for the others 
+    # per tile vref and vdda are specified in the json file in 
+    # cern_coldbox/vdda_spec/vref_vdda_cablelength.json where the key is 
+    # the tile name indicated as 'iog-tilenumber', like for example '1-1' 
+    # and the value is an array with 2 entries: vref and vdda. Additionally,
+    # for v2d we assume vcm_dac = 68, while v3 doesnt need one and we can use 0 as placeholer.
+    # all numbers taken from https://docs.google.com/spreadsheets/d/13QrENecXsHJahfXHwA1SGwCsAAyuePiqCspJ3QlDJXQ/edit?usp=sharing
+    # (the json vref is in mV, = VDDA * vref_dac / 256: convert_json_to_ke turns it back into vref_dac)
+    d_ke = convert_json_to_ke(d, geo, vdda_spec)
+    mean_ke_min, mean_ke_max = percentile_range([v[0] for c in d_ke.values() for v in c])
+    rms_ke_min, rms_ke_max = percentile_range([v[1] for c in d_ke.values() for v in c])
+    print('ke- colour range: mean {:g}-{:g}, RMS {:g}-{:g}'.format(mean_ke_min, mean_ke_max, rms_ke_min, rms_ke_max))
+    fig, axes = plt.subplots(1, 2, figsize=(52, 25), constrained_layout=True)
+    fig.suptitle(Path(input_file).stem, fontsize=22)
+    anode_plot(axes[0], geo, d_ke, 0, mean_ke_max, 'Pedestal mean [ke-]', min_bar=mean_ke_min)
+    anode_plot(axes[1], geo, d_ke, 1, rms_ke_max, 'Pedestal RMS [ke-]', min_bar=rms_ke_min)
+
+    print('Saving to: ', output_file[:-4]+'.Conversion2ke.png')
+    fig.savefig(output_file[:-4]+'.Conversion2ke.png', dpi=100)
+    plt.close(fig)
 
     ADCs = {}  # io_group -> ADCs
     for chip_key, channels in d.items():
@@ -158,6 +267,10 @@ def main(input_file, output_file, geometry, mean_max, rms_max, rate_max, occupan
     print('Saving to: ', output_file[:-4]+'.1DhistMean.png')
     fig.savefig(output_file[:-4]+'.1DhistMean.png')
 
+    # same but in ke- instead of ADC (converting ADC in mV and then to ke-)
+    hist_per_iog(d_ke, 0, 'Pedestal mean [ke-]', Path(input_file).stem,
+                 output_file[:-4]+'.Conversion2ke.1DhistMean.png', nbins)
+
     del fig
     ADCs = {}  # io_group -> ADCs
     for chip_key, channels in d.items():
@@ -183,6 +296,10 @@ def main(input_file, output_file, geometry, mean_max, rms_max, rate_max, occupan
 
     print('Saving to: ', output_file[:-4]+'.1DhistRMS.png')
     fig.savefig(output_file[:-4]+'.1DhistRMS.png')
+
+    # same but in ke- instead of ADC (converting ADC in mV and then to ke-)
+    hist_per_iog(d_ke, 1, 'Pedestal RMS [ke-]', Path(input_file).stem,
+                 output_file[:-4]+'.Conversion2ke.1DhistRMS.png', nbins)
 
     del fig
     fig, axes = plt.subplots(1, 2, figsize=(52, 25), constrained_layout=True)
@@ -218,6 +335,9 @@ if __name__ == '__main__':
                         help='''JSON-formatted dict of chip_key:channel''')
     parser.add_argument('--output_file', required=True, type=str, help='''Output plot file''')
     parser.add_argument('--geometry', required=True, type=str, help='''Multi-tile layout yaml''')
+    parser.add_argument('--vdda_spec', type=str,
+                        default=str(Path(__file__).resolve().parent.parent / 'vdda_spec' / 'vref_vdda_cablelength.json'),
+                        help='''JSON {"iog-tile": [vref, vdda]} in mV, for the ke- conversion (default: %(default)s)''')
     parser.add_argument('--mean_max', default=600., type=float,
                         help='''Color scale max for mean (default: %(default)s)''')
     parser.add_argument('--rms_max', default=5., type=float,

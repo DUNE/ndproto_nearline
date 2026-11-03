@@ -5,8 +5,12 @@
 # dropping ADC == 0 packets on the LArPix-v3 io_groups
 # rate [Hz] = selected data packets / livetime, livetime from the unix-time
 # packets (type 4); it is -1 if the file has no unix-time packets.
+# Large files: with --max_file_size only the first packets are read, the same fraction of
+# the packets as max_file_size / file size (i.e. roughly the first max_file_size bytes of the
+# run); mean, std, rate and livetime are then those of that first part.
 import argparse
 import json
+import os
 
 import h5py
 import numpy as np
@@ -15,19 +19,26 @@ FIELDS = ['io_group', 'io_channel', 'chip_id', 'channel_id', 'packet_type', 'val
 BLOCK = 10_000_000  # packets read at a time
 
 
-def main(input_file, output_file, v3_io_groups):
+def main(input_file, output_file, v3_io_groups, max_file_size):
     v3_io_groups = [int(x) for x in v3_io_groups.split(',') if x.strip()]
     keys, n, s, s2 = [], [], [], []
     unixtime = []  # (min, max) per block
     n_zero_v3 = 0
     with h5py.File(input_file, 'r') as f:
         dset = f['packets']
+        n_total = len(dset)
+        n_read = n_total
+        file_size = os.path.getsize(input_file)
+        if max_file_size > 0 and file_size > max_file_size:
+            n_read = int(n_total * max_file_size / file_size)
+            print('File is {:.1f} GB > {:.1f} GB: reading only the first {} of {} packets ({:.0%})'.format(
+                file_size / 1e9, max_file_size / 1e9, n_read, n_total, n_read / n_total))
         fields = [x for x in FIELDS if x in dset.dtype.names]
         missing = set(FIELDS) - set(fields) - {'timestamp'}
         if missing:
             raise SystemExit('{}: packets have no field {}'.format(input_file, ', '.join(sorted(missing))))
-        for start in range(0, len(dset), BLOCK):
-            p = dset.fields(fields)[start:start + BLOCK]
+        for start in range(0, n_read, BLOCK):
+            p = dset.fields(fields)[start:min(start + BLOCK, n_read)]
             if 'timestamp' in fields:
                 t = p['timestamp'][p['packet_type'] == 4]
                 if len(t):
@@ -82,5 +93,8 @@ if __name__ == '__main__':
     parser.add_argument('--v3_io_groups', default='3,4', type=str,
                         help='''Comma-separated LArPix-v3 io_groups, where ADC == 0 packets
                         are dropped (default: %(default)s)''')
+    parser.add_argument('--max_file_size', default=0, type=float,
+                        help='''Read only the first max_file_size / file size fraction of the packets
+                        if the file is larger than this, in bytes (default: %(default)s = read everything)''')
     args = parser.parse_args()
     main(**vars(args))

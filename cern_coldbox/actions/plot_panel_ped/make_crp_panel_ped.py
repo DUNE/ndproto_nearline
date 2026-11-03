@@ -71,7 +71,7 @@ def tile_images(geo, d, metric):
             ix, iy = pos
             if metric == -1:
                 images[tile][iy, ix] = len(values[2])
-            else:
+            elif values[metric] >= 0:  # -1 = not available (e.g. rate without unix-time packets): grey
                 images[tile][iy, ix] = values[metric]
 
     if metric == 0 and (missing_ioc or missing_chip):
@@ -187,22 +187,24 @@ def main(input_file, output_file, geometry, mean_max, rms_max, rate_max, occupan
     del fig
     fig, axes = plt.subplots(1, 2, figsize=(52, 25), constrained_layout=True)
     fig.suptitle(Path(input_file).stem, fontsize=22)
-    if any([rate_max==-1, rate_min==-1, occupancy_max ==-1 , occupancy_min == -1]):
-        arr = np.array(
-            [d[k][i] for k in d for i in range(64)],
-            dtype=float,)
-    if rate_max == -1:
-        vals = arr[:, :2]
-        rate_max = np.percentile(vals, 99)
-    if rate_min == -1:
-        vals = arr[:, :2]
-        rate_min = np.percentile(vals, 1)
-    if occupancy_max == -1:
-        vals = arr[:, :3]
-        occupancy_max = np.percentile(vals, 99)
-    if occupancy_min == -1:
-        vals = arr[:, :3]
-        occupancy_min = np.percentile(vals, 1)
+    # automatic colour range (-1): 1st-99th percentile of the plotted column only
+    # (JSON columns: 0 mean, 1 std, 2 rate, 3 occupancy), ignoring the -1 "no data" entries
+    arr = np.array([c for k in d for c in d[k]], dtype=float).reshape(-1, 4)
+
+    def auto_range(col, vmin, vmax):
+        vals = arr[arr[:, col] >= 0, col]
+        if len(vals) == 0:
+            return (0. if vmin == -1 else vmin), (1. if vmax == -1 else vmax)
+        lo = np.percentile(vals, 1) if vmin == -1 else vmin
+        hi = np.percentile(vals, 99) if vmax == -1 else vmax
+        if hi <= lo:  # all values (nearly) equal: open the range so pixels stay visible
+            hi = lo + max(abs(lo) * 0.1, 1e-3)
+        return lo, hi
+
+    rate_min, rate_max = auto_range(2, rate_min, rate_max)
+    occupancy_min, occupancy_max = auto_range(3, occupancy_min, occupancy_max)
+    print('Rate colour range: {:g}-{:g} Hz, occupancy: {:g}-{:g} packets'.format(
+        rate_min, rate_max, occupancy_min, occupancy_max))
     anode_plot(axes[0], geo, d, 2, rate_max, 'Rate [Hz]',min_bar=rate_min)
     anode_plot(axes[1], geo, d, 3, occupancy_max, 'Occupancy [number of packets]', min_bar=occupancy_min)
 

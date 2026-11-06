@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+.env
+
+# Large experimental and simulation data
+*.h5
+*.hdf5
+*.root
+*.npz
+*.npy
+
+# Large archives and temporary outputs
+*.tar
+*.tar.gz
+*.zip
+*.log
+
+# Credentials and private configuration
+*.pem
+*.key
+*.p12
+
+# Local caches and raw selected data
+selected_cache/
+frozen_brooke10_bs20/
+frozen_hit_timeseries_bs20/
+
+# Editor and OS artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+/docs/
+/old/

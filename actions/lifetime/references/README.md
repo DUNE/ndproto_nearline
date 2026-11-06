@@ -1,0 +1,1 @@
+Brooke Russell, **ND Prototypes — Electron Lifetime (May 1, 2025)**: [Presentation PDF](https://docs.dunescience.org/cgi-bin/sso/RetrieveFile?docid=33816&filename=NDPrototypes_electron_lifetime___Russell___1May2025.pdf&version=1)

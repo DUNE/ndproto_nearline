@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
-
 did_pfn_rse=$("$JUSTIN_PATH/justin-get-file")
 result=$?
 if [[ $result != 0 ]]; then
     echo "Got nothing from justin-get-file; bailing"
     exit
 fi
+
+set -euo pipefail
+
 echo "$did_pfn_rse"
 did=$(echo "$did_pfn_rse" | cut -f1 -d' ')
 pfn=$(echo "$did_pfn_rse" | cut -f2 -d' ')

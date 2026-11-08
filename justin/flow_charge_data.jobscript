@@ -2,24 +2,25 @@
 
 ## Example command to submit this job:
 # justin simple-workflow \
-#     --wall-seconds 1200 \
+#     --description pCRP-flow \
+#     --wall-seconds 3600 \
 #     --output-pattern '*.FLOW.hdf5' \
 #     --output-rse T3_US_NERSC \
-#     --max-distance 100 \
+#     --max-distance 110 \
 #     --scope usertests \
 #     --lifetime-days 30 \
 #     --image fnal-wn-el9:9.7 \
-#     --mql "files where core.run_type=vd-coldbox-pixels and core.date_tier=packet-raw and core.application.version=test4" \
-#     --env ND_NEARLINE_TAG=test4 \
-#     --env ND_NEARLINE_SCRIPTS_DIR=/cvmfs/fifeuser1.opensciencegrid.org/sw/dune/64a7827d368d191145b27aeee9d34571a0a56fb7
+#     --mql "files where core.run_type=vd-coldbox-pixels and core.application.name=bin2packet and core.application.version=test4 and core.start_time>1794093700" \
+#     --env ND_NEARLINE_TAG=test6 \
+#     --env ND_NEARLINE_SCRIPTS_DIR=/cvmfs/fifeuser1.opensciencegrid.org/sw/dune/64a7827d368d191145b27aeee9d34571a0a56fb7 \
 #     --jobscript flow_charge_data.jobscript
 
 ## Example command to test this job:
-# ./justin-test-jobscript.al9 \
-#     --mql "files where core.run_type=vd-coldbox-pixels and core.date_tier=packet-raw and core.application.version=test limit 1" \
-#     --env ND_NEARLINE_TAG=test \
-#     --env ND_NEARLINE_SCRIPTS_DIR=/cvmfs/fifeuser1.opensciencegrid.org/sw/dune/64a7827d368d191145b27aeee9d34571a0a56fb7 \
-#     --jobscript flow_charge_data.jobscript
+ # ./justin-test-jobscript.al9 \
+ #     --mql "files where core.run_type=vd-coldbox-pixels and core.application.name=bin2packet and core.application.version=test4" \
+ #     --env ND_NEARLINE_TAG=test6 \
+ #     --env ND_NEARLINE_SCRIPTS_DIR=/cvmfs/fifeuser1.opensciencegrid.org/sw/dune/64a7827d368d191145b27aeee9d34571a0a56fb7 \
+ #     --jobscript flow_charge_data.jobscript
 
 source "$ND_NEARLINE_SCRIPTS_DIR/ndproto_nearline/justin/setup.inc.sh"
 

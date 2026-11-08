@@ -41,7 +41,7 @@ xrdcp "$pfn" .
 input_file=$PWD/$input_fname
 output_file=$PWD/$output_fname
 
-pushd /cvmfs/fifeuser3.opensciencegrid.org/sw/dune/a50f29022aac8a9485be2da840ca9e345c83b8eb/ndlar_flow
+pushd /cvmfs/fifeuser2.opensciencegrid.org/sw/dune/926ecbfffb1a1f78ad3c87c7e731968edec46452/ndlar_flow
 export PYTHONPATH=$PWD/src${PYTHONPATH:+:$PYTHONPATH}
 python -m h5flow -i "$input_file" -o "$output_file" -c "$workflow1" "$workflow2" "$workflow3" "$workflow4"
 popd
